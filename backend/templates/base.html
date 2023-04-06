@@ -1,0 +1,54 @@
+<!doctype html>
+<title>Vacation Destination</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit&family=Montserrat&family=Open+Sans:wght@500&display=swap" rel="stylesheet">
+<body>
+    <div class="full-body-container">
+        <div class="top-text">
+            <div class="google-colors">
+                <h1 id="google-c">Vacation Destination</h1>
+            </div>
+            <div class="input-box" onclick="sendFocus()">
+                <img src="{{ url_for('static', filename='images/mag.png') }}" />
+                <input placeholder="Search for vacation cities" id="filter-text-val">
+            </div>
+            <div class="search-box">
+                <h1 id="search-button" onclick="filterText()">SEARCH</h1>
+            </div>
+        </div>
+        <div id="answer-box"></div>
+        <!-- <footer>Created by </footer> -->
+    </div>
+
+    <script>
+
+        function answerBoxTemplate(title){
+            return `<div class='city-box'>
+                <img src="{{ url_for('static', filename='images/chicago.jpg') }}" />
+                <h3 class='a'>${title}</h3>
+                <p class='episode-desc'>${"[interesting places in this city]"}</p>
+            </div>`
+        }
+
+        function sendFocus(){
+            document.getElementById('filter-text-val').focus()
+        }
+
+        function filterText(){
+            document.getElementById("answer-box").innerHTML = ""
+            console.log(document.getElementById("filter-text-val").value)
+            fetch("/episodes?" + new URLSearchParams({ title: document.getElementById("filter-text-val").value }).toString())
+            .then((response) => response.json())
+            .then((data) => data.forEach(row => {
+                
+                let tempDiv = document.createElement("div")
+                tempDiv.innerHTML = answerBoxTemplate(row.a)
+                document.getElementById("answer-box").appendChild(tempDiv)
+            }));
+
+        }
+            
+    </script>
+</body>
