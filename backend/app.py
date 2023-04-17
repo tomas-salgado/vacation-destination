@@ -9,23 +9,24 @@ from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 import pandas as pd
 import numpy as np
+import ast
 
 # ROOT_PATH for linking with all your files. 
 # Feel free to use a config.py or settings.py with a global export variable
-os.environ['ROOT_PATH'] = os.path.abspath(os.path.join("..",os.curdir))
+# os.environ['ROOT_PATH'] = os.path.abspath(os.path.join("..",os.curdir))
 
-# These are the DB credentials for your OWN MySQL
-# Don't worry about the deployment credentials, those are fixed
-# You can use a different DB name if you want to
-MYSQL_USER = "root"
-MYSQL_USER_PASSWORD = "L&83ksh!3"
-MYSQL_PORT = 3306
-MYSQL_DATABASE = "kardashiandb"
+# # These are the DB credentials for your OWN MySQL
+# # Don't worry about the deployment credentials, those are fixed
+# # You can use a different DB name if you want to
+# MYSQL_USER = "root"
+# MYSQL_USER_PASSWORD = "L&83ksh!3"
+# MYSQL_PORT = 3306
+# MYSQL_DATABASE = "kardashiandb"
 
-mysql_engine = MySQLDatabaseHandler(MYSQL_USER,MYSQL_USER_PASSWORD,MYSQL_PORT,MYSQL_DATABASE)
+# mysql_engine = MySQLDatabaseHandler(MYSQL_USER,MYSQL_USER_PASSWORD,MYSQL_PORT,MYSQL_DATABASE)
 
-# Path to init.sql file. This file can be replaced with your own file for testing on localhost, but do NOT move the init.sql file
-mysql_engine.load_file_into_db('.././vacation-destination/init.sql') #may need to add path to init.sql as parameter here
+# # Path to init.sql file. This file can be replaced with your own file for testing on localhost, but do NOT move the init.sql file
+# mysql_engine.load_file_into_db('.././vacation-destination/init.sql') #may need to add path to init.sql as parameter here
 
 app = Flask(__name__)
 CORS(app)
@@ -80,7 +81,7 @@ def td_matrix(df, city_index, city_rev_index, word_index, city_word_dic,
     return td_matrix, num_words, word_index
 
 
-def process_query(query, td_matrix, city_rev_index, tok_method, stemmer, stops, num_words, word_index, num_results=2):
+def process_query(query, td_matrix, city_rev_index, tok_method, stemmer, stops, num_words, word_index, num_results=5):
     query = tokenize_str(query, tok_method, stemmer, stops)
     qvec = np.zeros(num_words)
     for word in query:
@@ -96,39 +97,47 @@ def process_query(query, td_matrix, city_rev_index, tok_method, stemmer, stops, 
 
 # metadata
 def main(query):
-    df = pd.read_csv('./api_data.csv', names=['City', 'Description'])
+    files = ['./api_data_5mil.csv']
+    df = pd.DataFrame()
+    for file in files:
+        data = pd.read_csv(file, names=['City', 'Longitude', 'Latitude', 'Ratings', 'ObjectNames', 'Description'])
+        df = pd.concat([df, data], axis=0)
+    df = df[df['Description'] != '[]']
+    df.reset_index(inplace=True)
     stoplist = set(stopwords.words('english'))
     ps = PorterStemmer()
 
     # driver code
     city_index, city_rev_index, word_index, city_word_dic = city_word_indices(df, wordpunct_tokenize, ps, stoplist)
     td_mat, num_words, word_index = td_matrix(df, city_index, city_rev_index, word_index, city_word_dic)
-    top_2 = process_query(query, td_mat, city_rev_index, wordpunct_tokenize, ps, stoplist, num_words, word_index)
-    print(top_2)
-    data = {'a': top_2[0]}, {'a': top_2[1]}
-    #print(type(dic))
+    top_5 = process_query(query, td_mat, city_rev_index, wordpunct_tokenize, ps, stoplist, num_words, word_index)
+    print(top_5)
+
+    data = []
+    for i in range(len(top_5)):
+        objects_str = df[df['City'] == top_5[i]].reset_index()['ObjectNames'][0]
+        descr_str = df[df['City'] == top_5[i]].reset_index()['Description'][0]
+        ratings_str = df[df['City'] == top_5[i]].reset_index()['Ratings'][0]
+        objects = ast.literal_eval(objects_str)
+        descriptions = ast.literal_eval(descr_str)
+        ratings = ast.literal_eval(ratings_str)
+
+        data.append({'a': top_5[i], 'b': objects[np.argmax(ratings)]})
+        print(top_5[i], '- Top Attractions:', objects[np.argmax(ratings)])
     print(json.dumps([data]))
     return json.dumps(data)
 
-
-# Sample search, the LIKE operator in this case is hard-coded, 
-# but if you decide to use SQLAlchemy ORM framework, 
-# there's a much better and cleaner way to do this
-def sql_search(episode):
-    query_sql = f"""SELECT * FROM episodes WHERE LOWER( title ) LIKE '%%{episode.lower()}%%' limit 10"""
-    keys = ["id","title","descr"]
-    data = mysql_engine.query_selector(query_sql)
-    print(json.dumps([dict(zip(keys,i)) for i in data]))
-    return json.dumps([dict(zip(keys,i)) for i in data])
 
 @app.route("/")
 def home():
     return render_template('base.html',title="sample html")
 
+
 @app.route("/episodes")
 def episodes_search():
     text = request.args.get("title")
-    #return sql_search(text)
     return main(text)
 
+
 #app.run(debug=True)
+
