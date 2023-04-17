@@ -24,11 +24,11 @@
 
     <script>
 
-        function answerBoxTemplate(title){
+        function answerBoxTemplate(title, titleDescr){
             return `<div class='city-box'>
                 <img src="{{ url_for('static', filename='images/chicago.jpg') }}" />
                 <h3 class='a'>${title}</h3>
-                <p class='episode-desc'>${"[interesting places in this city]"}</p>
+                <p class='episode-desc'>${titleDescr}</p>
             </div>`
         }
 
@@ -44,7 +44,7 @@
             .then((data) => data.forEach(row => {
                 
                 let tempDiv = document.createElement("div")
-                tempDiv.innerHTML = answerBoxTemplate(row.a)
+                tempDiv.innerHTML = answerBoxTemplate(row.a, row.b)
                 document.getElementById("answer-box").appendChild(tempDiv)
             }));
 
