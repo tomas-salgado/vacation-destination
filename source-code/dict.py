@@ -7,7 +7,7 @@ def csv_to_diction(csv_file_path):
         reader = csv.DictReader(csv_file)
         temp_dict = {}
         for row in reader:
-            temp_dict[row['CITY']] = row['ANN']
+            temp_dict[row['CITY']] = row['ANN']-46
 
     return temp_dict
 
