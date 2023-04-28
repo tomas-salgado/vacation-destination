@@ -67,6 +67,17 @@
     background-color: aliceblue;
 }
 
+#loading-message {
+  display: none;
+  font-size: 14px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+#search-container.loading #loading-message {
+  display: block;
+}
+
 .search-box{
     background-color: rgb(54, 192, 0);
     padding-left: 10px;
