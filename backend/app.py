@@ -4,12 +4,12 @@ from flask import Flask, render_template, request
 from flask_cors import CORS
 from helpers.MySQLDatabaseHandler import MySQLDatabaseHandler
 import nltk
-from nltk import wordpunct_tokenize
-from nltk.stem import PorterStemmer
-from nltk.corpus import stopwords
+import ast
+from sklearn.preprocessing import normalize
+from sklearn.feature_extraction.text import TfidfVectorizer
+from scipy.sparse.linalg import svds
 import pandas as pd
 import numpy as np
-import ast
 
 # ROOT_PATH for linking with all your files. 
 # Feel free to use a config.py or settings.py with a global export variable
@@ -31,99 +31,71 @@ import ast
 app = Flask(__name__)
 CORS(app)
 
-# if stopwords fails make sure it's been downloaded
-nltk.download('stopwords')
-
-def tokenize_str(string, tok_method, stemmer, stoplist):
-    toks = wordpunct_tokenize(string)
-    toks = [w for w in toks if w not in stoplist]
-    toks = [stemmer.stem(w) for w in toks]
-    toks = [w.lower() for w in toks if w.isalpha()]
-    return toks
-
-
-def city_word_indices(df, tok_method, stemmer, stops):
-    desc = df['Description']
-    all_toks = set()
-    n_rows = len(desc)
-    city_word_dic = {}
-    for i in range(n_rows):
-        toks = tokenize_str(desc[i], wordpunct_tokenize, stemmer, stops)
-        tokset = toks
-        all_toks = all_toks.union(tokset)
-        city_word_dic[df['City'][i]] = toks
-    all_toks = list(all_toks)
-    all_toks.sort()
-    cities = df['City'].tolist()
-    cities.sort()
-    city_index = dict(zip(cities, list(range(n_rows))))
-    city_rev_index = dict(zip(list(range(n_rows)), cities))
-    word_index = dict(zip(all_toks, list(range(len(all_toks)))))
-    
-    return city_index, city_rev_index, word_index, city_word_dic
-
-
-# construct term-doc matrix
-def td_matrix(df, city_index, city_rev_index, word_index, city_word_dic, 
-              num_cities=None, num_words=None):
-    if num_cities == None: 
-        num_cities = len(city_index)
-
-    if num_words == None: 
-        num_words = len(word_index)
-
-    td_matrix = np.zeros(shape=(num_cities, num_words))
-    cities = df['City'].tolist()
-    for city in cities:
-        for word in city_word_dic[city]:
-            td_matrix[city_index[city]][word_index[word]] += 1
-    td_matrix = (td_matrix.T / np.linalg.norm(td_matrix, axis=1)).T
-    return td_matrix, num_words, word_index
-
-
-def process_query(query, td_matrix, city_rev_index, tok_method, stemmer, stops, num_words, word_index, num_results=5):
-    query = tokenize_str(query, tok_method, stemmer, stops)
-    qvec = np.zeros(num_words)
-    for word in query:
-        if word in word_index:
-            qvec[word_index[word]] += 1
-    np.seterr(invalid='ignore')
-    qvec = qvec / np.linalg.norm(qvec)
-    sim = td_matrix @ qvec
-    top_k = (-sim).argsort()[:num_results]
-    top_k = [city_rev_index[k] for k in top_k]
-    return top_k 
-
 
 # metadata
 def main(query):
-    files = ['./api_data_5mil.csv']
+    # construct data
+    files = ['api_data_usacomp.csv', 'api_data_5+mil.csv', 'api_data_2_5_mil.csv', 'api_data_1_2_mil.csv',
+             'api_data_250_500k.csv']#, 'api_data_100_250k.csv']
     df = pd.DataFrame()
     for file in files:
-        data = pd.read_csv(file, names=['City', 'Longitude', 'Latitude', 'Ratings', 'ObjectNames', 'Description'])
+        data = pd.read_csv(file, names=['City', 'Longitude', 'Latitude', 'Ratings', 
+                                             'ObjectNames', 'Description'])
         df = pd.concat([df, data], axis=0)
     df = df[df['Description'] != '[]']
     df.reset_index(inplace=True)
-    stoplist = set(stopwords.words('english'))
-    ps = PorterStemmer()
+    p = df['Description']
 
-    # driver code
-    city_index, city_rev_index, word_index, city_word_dic = city_word_indices(df, wordpunct_tokenize, ps, stoplist)
-    td_mat, num_words, word_index = td_matrix(df, city_index, city_rev_index, word_index, city_word_dic)
-    top_5 = process_query(query, td_mat, city_rev_index, wordpunct_tokenize, ps, stoplist, num_words, word_index)
-    print(top_5)
+    # cosine similarity 
+    vectorizer = TfidfVectorizer(stop_words = 'english', max_df = .7, min_df = 1)
+    td_matrix = vectorizer.fit_transform([x for x in df['Description']])
+    td_matrix_np = td_matrix.toarray()
+    td_matrix_np = normalize(td_matrix_np)
+    docs_compressed, s, words_compressed = svds(td_matrix, k=100)
+    words_compressed = words_compressed.transpose()
+    docs_compressed_normed = normalize(docs_compressed)
+    word_to_index = vectorizer.vocabulary_
+    index_to_word = {i:t for t,i in word_to_index.items()}
 
     data = []
-    for i in range(len(top_5)):
-        objects_str = df[df['City'] == top_5[i]].reset_index()['ObjectNames'][0]
-        descr_str = df[df['City'] == top_5[i]].reset_index()['Description'][0]
-        ratings_str = df[df['City'] == top_5[i]].reset_index()['Ratings'][0]
-        objects = ast.literal_eval(objects_str)
-        descriptions = ast.literal_eval(descr_str)
-        ratings = ast.literal_eval(ratings_str)
+    # driver code
+    query = input("Type a query: ")
+    # query = "beaches"
+    query = vectorizer.transform([query]).toarray()
+    query_vec = normalize(np.dot(query, words_compressed)).squeeze()
+    def closest_cities_to_query(query_vec_in, k = 5):
+        sims = docs_compressed_normed.dot(query_vec_in)
+        asort = np.argsort(-sims)[:k+1]
+        return [(i, df['City'][i], sims[i]) for i in asort[1:]]
 
-        data.append({'a': top_5[i], 'b': objects[np.argmax(ratings)]})
-        print(top_5[i], '- Top Attractions:', objects[np.argmax(ratings)])
+    for i, city, sim in closest_cities_to_query(query_vec):
+        if sim != 0:
+            objects_str = df['ObjectNames'][i]
+            descr_str = df['Description'][i]
+            ratings_str = df['Ratings'][i]
+            objects = ast.literal_eval(objects_str)
+            descriptions = ast.literal_eval(descr_str)
+            description_sims = [normalize(np.dot(vectorizer.transform([i]).toarray(), words_compressed)).squeeze() 
+                                for i in descriptions]
+            description_sims = [i.dot(query_vec) for i in description_sims]
+            idx = np.argpartition(description_sims, max(-len(description_sims),-5))[-5:]
+            ratings = ast.literal_eval(ratings_str)
+            ratings = [int(ratings[i][0]) for i in range(len(ratings))]
+
+            top_objects = [objects[i] for i in idx]
+            top_obj_descriptions = [descriptions[i] for i in idx]
+            rating_score = int(np.mean(ratings)/3*100)
+
+            print(city) 
+            print('Similarity Score: ', sim)
+            print("Popularity Score: ", rating_score)
+            print('Top Attractions: ')
+            print("{}".format(top_objects))
+        else:
+            print('No Matches Found!')
+
+        data.append({'a': city, 'b': top_objects[i]})
+#         print(top_5[i], '- Top Attractions:', objects[np.argmax(ratings)])
     print(json.dumps([data]))
     return json.dumps(data)
 
