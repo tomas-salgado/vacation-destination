@@ -69,6 +69,8 @@ def main(query):
         return [(i, df['City'][i], sims[i]) for i in asort[1:]]
 
     for i, city, sim in closest_cities_to_query(query_vec):
+        top_objects = []
+        top_obj_descriptions = []
         if sim != 0:
             objects_str = df['ObjectNames'][i]
             descr_str = df['Description'][i]
