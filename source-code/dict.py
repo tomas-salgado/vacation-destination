@@ -17,12 +17,12 @@ def csv_to_diction_crime(csv_file_path):
         reader = csv.DictReader(csv_file)
         crime_dict = {}
         for row in reader:
-            crime_dict[row['communityname']] = row['ViolentCrimesPerPop']
+            crime_dict[row['city']] = row['Safety Index']
         return crime_dict
 
 
 my_csv_to_dict = csv_to_diction('city_temperature.csv')
-my_csvcrime = csv_to_diction_crime('crime_data_.csv')
+my_csvcrime = csv_to_diction_crime('crime.csv')
 
 
 def avg_temps(from_csv_dict):
