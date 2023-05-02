@@ -3,48 +3,33 @@ import os
 from flask import Flask, render_template, request
 from flask_cors import CORS
 from helpers.MySQLDatabaseHandler import MySQLDatabaseHandler
-import nltk
 import ast
 from sklearn.preprocessing import normalize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse.linalg import svds
 import pandas as pd
 import numpy as np
-
-# ROOT_PATH for linking with all your files. 
-# Feel free to use a config.py or settings.py with a global export variable
-# os.environ['ROOT_PATH'] = os.path.abspath(os.path.join("..",os.curdir))
-
-# # These are the DB credentials for your OWN MySQL
-# # Don't worry about the deployment credentials, those are fixed
-# # You can use a different DB name if you want to
-# MYSQL_USER = "root"
-# MYSQL_USER_PASSWORD = "L&83ksh!3"
-# MYSQL_PORT = 3306
-# MYSQL_DATABASE = "kardashiandb"
-
-# mysql_engine = MySQLDatabaseHandler(MYSQL_USER,MYSQL_USER_PASSWORD,MYSQL_PORT,MYSQL_DATABASE)
-
-# # Path to init.sql file. This file can be replaced with your own file for testing on localhost, but do NOT move the init.sql file
-# mysql_engine.load_file_into_db('.././vacation-destination/init.sql') #may need to add path to init.sql as parameter here
+import re
+import requests
 
 app = Flask(__name__)
 CORS(app)
 
 
-# metadata
 def main(query):
-    # construct data
-    files = ['api_data_usacomp.csv', 'api_data_5+mil.csv', 'api_data_2_5_mil.csv', 'api_data_1_2_mil.csv',
-             'api_data_250_500k.csv']#, 'api_data_100_250k.csv']
+    files = ['../data_usa.csv']
     df = pd.DataFrame()
     for file in files:
         data = pd.read_csv(file, names=['City', 'Longitude', 'Latitude', 'Ratings', 
-                                             'ObjectNames', 'Description'])
+                                            'ObjectNames', 'Description'])
         df = pd.concat([df, data], axis=0)
     df = df[df['Description'] != '[]']
     df.reset_index(inplace=True)
     p = df['Description']
+
+
+    # In[75]:
+
 
     # cosine similarity 
     vectorizer = TfidfVectorizer(stop_words = 'english', max_df = .7, min_df = 1)
@@ -59,8 +44,6 @@ def main(query):
 
     data = []
     # driver code
-    query = input("Type a query: ")
-    # query = "beaches"
     query = vectorizer.transform([query]).toarray()
     query_vec = normalize(np.dot(query, words_compressed)).squeeze()
     def closest_cities_to_query(query_vec_in, k = 5):
@@ -68,9 +51,9 @@ def main(query):
         asort = np.argsort(-sims)[:k+1]
         return [(i, df['City'][i], sims[i]) for i in asort[1:]]
 
+    no_matches_found = False
+
     for i, city, sim in closest_cities_to_query(query_vec):
-        top_objects = []
-        top_obj_descriptions = []
         if sim != 0:
             objects_str = df['ObjectNames'][i]
             descr_str = df['Description'][i]
@@ -89,17 +72,35 @@ def main(query):
             rating_score = int(np.mean(ratings)/3*100)
 
             print(city) 
-            print('Similarity Score: ', sim)
+            print('Similarity Score: ', round(sim, 0))
             print("Popularity Score: ", rating_score)
             print('Top Attractions: ')
             print("{}".format(top_objects))
+            objects_str = ""
+            for object in top_objects: 
+                objects_str += str(object) + ", "
+            data.append({'a': city, 'b': "Attractions: " + objects_str[:-2], 'c': "Relevancy: " + str(round(sim*100, 1)) + "%", 'd': get_city_review(city)})
         else:
             print('No Matches Found!')
+            no_matches_found = True
 
-        data.append({'a': city, 'b': top_objects[i]})
-#         print(top_5[i], '- Top Attractions:', objects[np.argmax(ratings)])
-    print(json.dumps([data]))
+    if no_matches_found: 
+        data.append({'a': "No matches found!", 'b': 'Try a different search', 'c': "", 'd': ""})
+
     return json.dumps(data)
+
+
+def get_city_review(city):
+    search_url = f"https://www.google.com/search?q={city}+city+review"
+    response = requests.get(search_url)
+    html_content = response.text
+
+    # find rating
+    rating_regex = r'<div class="BNeawe s3v9rd AP7Wnd">(.*?)</div>'
+    rating_match = re.search(rating_regex, html_content)
+    rating_text = rating_match.group(1).strip() if rating_match else None
+
+    return rating_text[rating_text.rfind(">")+1:]
 
 
 @app.route("/")
@@ -113,5 +114,4 @@ def episodes_search():
     return main(text)
 
 
-#app.run(debug=True)
-
+# app.run(debug=True)
