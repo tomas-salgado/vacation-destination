@@ -20,20 +20,17 @@
         </div>
         <div id="answer-box"></div>
         <!-- <footer>Created by </footer> -->
-     <div id="search-container">
-  <input type="text" id="search-input" placeholder="Search...">
-  <button id="search-button">Search</button>
-  <div id="loading-message">Loading...</div>
-    </div>
     </div>
 
     <script>
 
-        function answerBoxTemplate(title, titleDescr){
+        function answerBoxTemplate(title, titleDescr, score, review){
             return `<div class='city-box'>
-                <img src="{{ url_for('static', filename='images/chicago.jpg') }}" />
-                <h3 class='a'>${title}</h3>
+                <h3 class='episode-title'>${title}</h3>
+                <p class='episode-desc'>${score}</p>
                 <p class='episode-desc'>${titleDescr}</p>
+                <p class='episode-desc'><em>"${review}"</em></p>
+                
             </div>`
         }
 
@@ -42,23 +39,18 @@
         }
 
         function filterText(){
-            document.getElementById("answer-box").innerHTML = "<p>Loading...</p>";
-
             document.getElementById("answer-box").innerHTML = ""
             console.log(document.getElementById("filter-text-val").value)
             fetch("/episodes?" + new URLSearchParams({ title: document.getElementById("filter-text-val").value }).toString())
             .then((response) => response.json())
-            .then((data) => {
-            document.getElementById("answer-box").innerHTML = "";
             .then((data) => data.forEach(row => {
-
                 
                 let tempDiv = document.createElement("div")
-                tempDiv.innerHTML = answerBoxTemplate(row.a, row.b)
+                tempDiv.innerHTML = answerBoxTemplate(row.a, row.b, row.c, row.d)
                 document.getElementById("answer-box").appendChild(tempDiv)
             }));
-         }));
-       }
+
+        }
             
     </script>
 </body>
