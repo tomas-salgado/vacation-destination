@@ -21,15 +21,11 @@ def main(query):
     df = pd.DataFrame()
     for file in files:
         data = pd.read_csv(file, names=['City', 'Longitude', 'Latitude', 'Ratings', 
-                                            'ObjectNames', 'Description'])
+                                            'ObjectNames', 'Description', 'Reviews'])
         df = pd.concat([df, data], axis=0)
     df = df[df['Description'] != '[]']
     df.reset_index(inplace=True)
     p = df['Description']
-
-
-    # In[75]:
-
 
     # cosine similarity 
     vectorizer = TfidfVectorizer(stop_words = 'english', max_df = .7, min_df = 1)
@@ -71,36 +67,23 @@ def main(query):
             top_obj_descriptions = [descriptions[i] for i in idx]
             rating_score = int(np.mean(ratings)/3*100)
 
-#             print(city) 
-#             print('Similarity Score: ', round(sim, 0))
-#             print("Popularity Score: ", rating_score)
-#             print('Top Attractions: ')
-#             print("{}".format(top_objects))
+            print(city) 
+            print('Similarity Score: ', round(sim, 0))
+            print("Popularity Score: ", rating_score)
+            print('Top Attractions: ')
+            print("{}".format(top_objects))
             objects_str = ""
             for object in top_objects: 
                 objects_str += str(object) + ", "
-            data.append({'a': city, 'b': "Attractions: " + objects_str[:-2], 'c': "Relevancy: " + str(round(sim*100, 1)) + "%", 'd': get_city_review(city)})
+            data.append({'a': city, 'b': "Attractions: " + objects_str[:-2], 'c': "Relevancy: " + str(round(sim*100, 1)) + "%", 'd': str(df.loc[i, ['Reviews']][0])})
         else:
-#             print('No Matches Found!')
+            print('No Matches Found!')
             no_matches_found = True
 
     if no_matches_found: 
         data.append({'a': "No matches found!", 'b': 'Try a different search', 'c': "", 'd': ""})
 
     return json.dumps(data)
-
-
-def get_city_review(city):
-    search_url = f"https://www.google.com/search?q={city}+city+review"
-    response = requests.get(search_url)
-    html_content = response.text
-
-    # find rating
-    rating_regex = r'<div class="BNeawe s3v9rd AP7Wnd">(.*?)</div>'
-    rating_match = re.search(rating_regex, html_content)
-    rating_text = rating_match.group(1).strip() if rating_match else None
-
-    return rating_text[rating_text.rfind(">")+1:]
 
 
 @app.route("/")
