@@ -17,7 +17,7 @@ CORS(app)
 
 
 def main(query):
-    files = ['../data_usa.csv']
+    files = ['./data_usa.csv']
     df = pd.DataFrame()
     for file in files:
         data = pd.read_csv(file, names=['City', 'Longitude', 'Latitude', 'Ratings', 
