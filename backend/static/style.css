@@ -10,7 +10,9 @@
     justify-content: start;
     align-items: center;
     flex-direction: column;
+    background-color: black;
     background-image: url(images/background.jpg);
+    
     background-position: center;
     background-size: cover;
     z-index: -10;
@@ -96,7 +98,7 @@
 
 #answer-box{
     width: 700px;
-    margin-top:50px;
+    margin-top:20px;
 }
 
 .city-box{
@@ -136,6 +138,7 @@
 
 .episode-title{
     font-family: 'Kanit', sans-serif;
+    font-size: x-large;
 }
 
 .episode-desc{
@@ -144,5 +147,6 @@
 
 
 .answer-box{
-    background-color: #f9f9f9;
+    background-color: #a7f181;
 }
+
