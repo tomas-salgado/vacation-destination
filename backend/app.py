@@ -71,17 +71,17 @@ def main(query):
             top_obj_descriptions = [descriptions[i] for i in idx]
             rating_score = int(np.mean(ratings)/3*100)
 
-            print(city) 
-            print('Similarity Score: ', round(sim, 0))
-            print("Popularity Score: ", rating_score)
-            print('Top Attractions: ')
-            print("{}".format(top_objects))
+#             print(city) 
+#             print('Similarity Score: ', round(sim, 0))
+#             print("Popularity Score: ", rating_score)
+#             print('Top Attractions: ')
+#             print("{}".format(top_objects))
             objects_str = ""
             for object in top_objects: 
                 objects_str += str(object) + ", "
             data.append({'a': city, 'b': "Attractions: " + objects_str[:-2], 'c': "Relevancy: " + str(round(sim*100, 1)) + "%", 'd': get_city_review(city)})
         else:
-            print('No Matches Found!')
+#             print('No Matches Found!')
             no_matches_found = True
 
     if no_matches_found: 
